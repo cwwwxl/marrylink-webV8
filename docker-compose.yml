@@ -1,0 +1,86 @@
+# MarryLink Docker Compose 配置
+# 包含：Backend、Frontend (管理后台)、Mobile App (H5)
+# MySQL 和 Redis 使用外部服务
+
+version: '3.8'
+
+services:
+  # ==================== 后端服务 ====================
+  backend:
+    build:
+      context: ./marrylink-admin/backend
+      dockerfile: Dockerfile
+    image: marrylink-backend:${VERSION:-latest}
+    container_name: marrylink-backend
+    restart: unless-stopped
+    environment:
+      # Spring Profile
+      SPRING_PROFILES_ACTIVE: docker
+      # MySQL 配置（外部服务）
+      MYSQL_HOST: ${MYSQL_HOST:-localhost}
+      MYSQL_PORT: ${MYSQL_PORT:-3306}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-marrylink}
+      MYSQL_USER: ${MYSQL_USER:-marrylink}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-marrylink123}
+      # Redis 配置（外部服务）
+      REDIS_HOST: ${REDIS_HOST:-localhost}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-marrylink123}
+      # JWT 配置
+      JWT_SECRET: ${JWT_SECRET:-marrylink-admin-secret-key-2024-for-jwt-token-signing-must-be-at-least-256-bits}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-86400000}
+      # JVM 配置（包含远程调试参数）
+      JAVA_OPTS: ${JAVA_OPTS:--Xms512m -Xmx1024m -XX:+UseG1GC -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005}
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+      - "${DEBUG_PORT:-5005}:5005"  # 远程调试端口
+    volumes:
+      - backend_logs:/app/logs
+      # 挂载本地头像文件目录到容器，使用开发环境的头像数据
+      - ./marrylink-admin/uploads:/app/uploads
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - marrylink-network
+
+  # ==================== 管理后台前端 ====================
+  frontend:
+    build:
+      context: ./marrylink-web
+      dockerfile: Dockerfile
+    image: marrylink-frontend:${VERSION:-latest}
+    container_name: marrylink-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    networks:
+      - marrylink-network
+
+  # ==================== 移动端 H5 应用 ====================
+  mobile-app:
+    build:
+      context: ./marrylink-app
+      dockerfile: Dockerfile
+    image: marrylink-mobile:${VERSION:-latest}
+    container_name: marrylink-mobile
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${MOBILE_PORT:-80}:80"
+    networks:
+      - marrylink-network
+
+# ==================== 数据卷 ====================
+volumes:
+  backend_logs:
+    driver: local
+  backend_uploads:
+    driver: local
+
+# ==================== 网络 ====================
+networks:
+  marrylink-network:
+    driver: bridge

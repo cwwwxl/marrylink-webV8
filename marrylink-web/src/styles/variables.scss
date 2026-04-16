@@ -1,0 +1,63 @@
+@forward "element-plus/theme-chalk/src/common/var.scss" with (
+  $colors: (
+    "primary": (
+      "base": #1d4ed8,
+    ),
+    "success": (
+      "base": #10b981,
+    ),
+    "warning": (
+      "base": #f59e0b,
+    ),
+    "danger": (
+      "base": #ef4444,
+    ),
+    "info": (
+      "base": #6b7280,
+    ),
+  ),
+
+  $bg-color: (
+    "page": #f0f7ff,
+  )
+);
+
+/** 全局SCSS变量 - 浅蓝色和白色主题 */
+
+:root {
+  --menu-background: #ffffff;
+  --menu-text: #4b5563;
+  --menu-active-text: #1d4ed8;
+  --menu-hover: #e0f2fe;
+  --sidebar-logo-background: #f0f7ff;
+  
+  // 浅蓝色主题额外变量
+  --primary-light: #dbeafe;
+  --primary-lighter: #eff6ff;
+  --border-light: #e5e7eb;
+
+  // 修复表格 fixed 列被选中后由于透明色导致叠字的 bug
+  .el-table {
+    --el-table-current-row-bg-color: #eff6ff;
+  }
+}
+
+/** 暗黑主题 */
+html.dark {
+  --menu-background: var(--el-bg-color-overlay);
+  --menu-text: #fff;
+  --menu-active-text: var(--el-menu-active-color);
+  --menu-hover: rgb(0 0 0 / 20%);
+  --sidebar-logo-background: rgb(0 0 0 / 20%);
+}
+
+$menu-background: var(--menu-background); // 菜单背景色
+$menu-text: var(--menu-text); // 菜单文字颜色
+$menu-active-text: var(--menu-active-text); // 菜单激活文字颜色
+$menu-hover: var(--menu-hover); // 菜单悬停背景色
+$sidebar-logo-background: var(--sidebar-logo-background); // 侧边栏 Logo 背景色
+
+$sidebar-width: 210px; // 侧边栏宽度
+$sidebar-width-collapsed: 54px; // 侧边栏收缩宽度
+$navbar-height: 50px; // 导航栏高度
+$tags-view-height: 34px; // TagsView 高度

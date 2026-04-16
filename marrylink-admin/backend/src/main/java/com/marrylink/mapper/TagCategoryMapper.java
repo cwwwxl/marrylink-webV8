@@ -1,0 +1,16 @@
+package com.marrylink.mapper;
+
+import com.marrylink.entity.TagCategory;
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+
+/**
+ * <p>
+ *  Mapper 接口
+ * </p>
+ *
+ * @author author
+ * @since 2026-01-04
+ */
+public interface TagCategoryMapper extends BaseMapper<TagCategory> {
+
+}

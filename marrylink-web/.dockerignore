@@ -1,0 +1,50 @@
+# Node modules
+node_modules/
+
+# Build output（保留 dist 供直接部署使用）
+# dist/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+*.md
+docs/
+
+# Test files
+tests/
+__tests__/
+coverage/
+
+# Environment files (use docker-compose for env)
+.env.local
+.env.*.local
+
+# Husky
+.husky/
+
+# Cache
+.cache/
+.eslintcache
+.stylelintcache
+
+# Mock
+mock/

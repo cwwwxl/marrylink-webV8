@@ -1,0 +1,40 @@
+{
+  "name": "marrylink-app",
+  "version": "1.0.0",
+  "description": "MarryLink 婚礼管理系统移动端",
+  "main": "main.js",
+  "scripts": {
+    "dev:mp-weixin": "cross-env NODE_ENV=development UNI_PLATFORM=mp-weixin vue-cli-service uni-build --watch",
+    "build:mp-weixin": "cross-env NODE_ENV=production UNI_PLATFORM=mp-weixin vue-cli-service uni-build",
+    "dev:h5": "cross-env NODE_ENV=development UNI_PLATFORM=h5 vue-cli-service uni-serve",
+    "build:h5": "cross-env NODE_ENV=production UNI_PLATFORM=h5 vue-cli-service uni-build",
+    "dev:app-plus": "cross-env NODE_ENV=development UNI_PLATFORM=app-plus vue-cli-service uni-build --watch",
+    "build:app-plus": "cross-env NODE_ENV=production UNI_PLATFORM=app-plus vue-cli-service uni-build"
+  },
+  "dependencies": {
+    "@dcloudio/uni-app": "2.0.2-3081220230817001",
+    "@dcloudio/uni-app-plus": "2.0.2-3081220230817001",
+    "@dcloudio/uni-h5": "2.0.2-3081220230817001",
+    "@dcloudio/uni-mp-weixin": "2.0.2-3081220230817001",
+    "vue": "^2.6.14",
+    "vuex": "^3.6.2"
+  },
+  "devDependencies": {
+    "@dcloudio/uni-cli-shared": "2.0.2-3081220230817001",
+    "@dcloudio/uni-template-compiler": "2.0.2-3081220230817001",
+    "@dcloudio/vue-cli-plugin-uni": "2.0.2-3081220230817001",
+    "@dcloudio/webpack-uni-mp-loader": "2.0.2-3081220230817001",
+    "@dcloudio/webpack-uni-pages-loader": "2.0.2-3081220230817001",
+    "@vue/cli-plugin-babel": "~4.5.19",
+    "@vue/cli-service": "~4.5.19",
+    "cross-env": "^7.0.3",
+    "mini-types": "*",
+    "miniprogram-api-typings": "*",
+    "postcss-comment": "^2.0.0",
+    "vue-template-compiler": "^2.6.14"
+  },
+  "browserslist": [
+    "Android >= 4.4",
+    "ios >= 9"
+  ]
+}

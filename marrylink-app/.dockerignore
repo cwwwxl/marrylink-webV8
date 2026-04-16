@@ -1,0 +1,33 @@
+# Node modules
+node_modules/
+
+# Build output（保留 dist 供直接部署使用）
+# dist/
+unpackage/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+*.md
+
+# Static zip
+*.zip
+
+# Cache
+.cache/

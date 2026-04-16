@@ -1,0 +1,24 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /api/v1
+
+spring:
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3306/marrylinkv2?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: root
+    password: 123456
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  redis:
+    host: 124.156.227.114
+    port: 6378
+    password: Qm8%k!s3@H
+
+mybatis-plus:
+  mapper-locations: classpath:/mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+
+jwt:
+  secret: marrylink-admin-secret-key-2024-for-jwt-token-signing-must-be-at-least-256-bits
+  expiration: 86400000  # 24小时（毫秒）
