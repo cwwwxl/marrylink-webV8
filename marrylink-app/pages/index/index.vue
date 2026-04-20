@@ -73,9 +73,9 @@
             <view class="action-icon green">💎</view>
             <text class="action-text">我的订单</text>
           </view>
-          <view class="action-item" @click="goToMore">
-            <view class="action-icon orange">⚙️</view>
-            <text class="action-text">更多</text>
+          <view class="action-item" @click="goToVideoUpload">
+            <view class="action-icon orange">🎬</view>
+            <text class="action-text">案例视频</text>
           </view>
         </view>
       </view>
@@ -240,25 +240,37 @@
         </scroll-view>
       </view>
       
-      <!-- 婚礼案例 -->
+      <!-- 案例视频 -->
       <view class="section">
         <view class="section-header">
-          <text class="section-title">精彩案例</text>
+          <text class="section-title">精彩案例视频</text>
         </view>
-        
-        <view class="case-grid">
-          <view 
-            class="case-item" 
-            v-for="caseItem in cases" 
-            :key="caseItem.id"
-            @click="viewCase(caseItem.id)"
+
+        <view class="video-grid" v-if="caseVideos.length > 0">
+          <view
+            class="video-item"
+            v-for="video in caseVideos"
+            :key="video.id"
+            @click="playVideo(video.id)"
           >
-            <image class="case-image" :src="caseItem.image" mode="aspectFill"></image>
-            <view class="case-info">
-              <text class="case-title">{{ caseItem.title }}</text>
-              <text class="case-date">{{ caseItem.date }}</text>
+            <view class="video-cover">
+              <image v-if="video.coverUrl" class="cover-image" :src="BASE_URL + video.coverUrl" mode="aspectFill"></image>
+              <view v-else class="cover-placeholder">
+                <text class="play-icon">&#9654;</text>
+              </view>
+              <view class="video-duration" v-if="video.duration">
+                <text>{{ formatDuration(video.duration) }}</text>
+              </view>
+            </view>
+            <view class="video-info">
+              <text class="video-title">{{ video.title }}</text>
+              <text class="video-desc">{{ video.description || '精彩婚礼案例' }}</text>
             </view>
           </view>
+        </view>
+        <view v-else class="empty-state">
+          <text class="empty-icon">🎬</text>
+          <text class="empty-text">暂无案例视频</text>
         </view>
       </view>
     </view>
@@ -268,6 +280,7 @@
 <script>
 import { mapState } from 'vuex'
 import { getHostList, getTagList } from '@/api/host'
+import { getHomeVideos } from '@/api/video'
 import {
   getHostDashboardStats,
   getHostPendingQuestionnaires,
@@ -289,32 +302,7 @@ export default {
       ],
       recommendHosts: [],
       tagDict: [],
-      cases: [
-        {
-          id: 1,
-          title: '浪漫海边婚礼',
-          image: '/static/case1.png',
-          date: '2024-01-15'
-        },
-        {
-          id: 2,
-          title: '梦幻城堡婚礼',
-          image: '/static/case2.png',
-          date: '2026-02-20'
-        },
-        {
-          id: 3,
-          title: '温馨草坪婚礼',
-          image: '/static/case3.png',
-          date: '2025-12-10'
-        },
-        {
-          id: 4,
-          title: '星空露台婚礼',
-          image: '/static/case4.png',
-          date: '2025-01-16'
-        }
-      ],
+      caseVideos: [],
       
       // 主持人工作台数据
       stats: {
@@ -392,6 +380,7 @@ export default {
       this.loadTagList().finally(() => {
         this.loadRecommendHosts()
       })
+      this.loadCaseVideos()
     }
   },
   
@@ -638,6 +627,13 @@ export default {
         url: '/pages/mine/index'
       })
     },
+
+    // 跳转到案例视频管理
+    goToVideoUpload() {
+      uni.navigateTo({
+        url: '/pages/video/upload'
+      })
+    },
     
     // ========== 消息相关方法 ==========
     
@@ -781,6 +777,32 @@ export default {
         title: '案例详情开发中',
         icon: 'none'
       })
+    },
+
+    // 加载案例视频
+    async loadCaseVideos() {
+      try {
+        const res = await getHomeVideos()
+        if (res.code === 200 || res.code === '00000') {
+          this.caseVideos = res.data || []
+        }
+      } catch (error) {
+        console.error('加载案例视频失败:', error)
+      }
+    },
+
+    // 播放视频
+    playVideo(id) {
+      uni.navigateTo({
+        url: `/pages/video/play?id=${id}`
+      })
+    },
+
+    // 格式化视频时长
+    formatDuration(seconds) {
+      const min = Math.floor(seconds / 60)
+      const sec = seconds % 60
+      return `${min}:${sec.toString().padStart(2, '0')}`
     }
   }
 }
@@ -1478,35 +1500,80 @@ export default {
   }
 }
 
-.case-grid {
+.video-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 20rpx;
-  
-  .case-item {
+
+  .video-item {
     border-radius: 16rpx;
     overflow: hidden;
     background-color: #f5f7fa;
-    
-    .case-image {
+
+    .video-cover {
       width: 100%;
       height: 240rpx;
+      position: relative;
+      background: #e5e7eb;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+
+      .cover-image {
+        width: 100%;
+        height: 100%;
+      }
+
+      .cover-placeholder {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #1d4ed8 0%, #3b82f6 100%);
+
+        .play-icon {
+          font-size: 60rpx;
+          color: #ffffff;
+        }
+      }
+
+      .video-duration {
+        position: absolute;
+        bottom: 8rpx;
+        right: 8rpx;
+        background: rgba(0, 0, 0, 0.6);
+        padding: 4rpx 12rpx;
+        border-radius: 8rpx;
+
+        text {
+          font-size: 20rpx;
+          color: #ffffff;
+        }
+      }
     }
-    
-    .case-info {
+
+    .video-info {
       padding: 20rpx;
-      
-      .case-title {
+
+      .video-title {
         display: block;
         font-size: 26rpx;
         font-weight: bold;
         color: #333333;
         margin-bottom: 8rpx;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
-      
-      .case-date {
+
+      .video-desc {
+        display: block;
         font-size: 22rpx;
         color: #999999;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
     }
   }

@@ -141,3 +141,22 @@ export const exportQuestionnaireSubmissionPdf = (id) => {
 export const getUserQuestionnaireSubmissions = (params) => get(`/questionnaire-submission/userQuestion`, params)
 export const submitQuestionnaire = (data) => post('/questionnaire-submission/submit', data)
 export const updateQuestionnaireSubmission = (data) => put('/questionnaire-submission/update', data)
+
+// 案例视频管理
+export const getHostVideoPage = (params) => get('/host-video/page', params)
+export const getHostVideoById = (id) => get(`/host-video/${id}`)
+export const uploadHostVideo = (formData) => {
+  return request({
+    url: '/host-video/upload',
+    method: 'post',
+    data: formData,
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    },
+    timeout: 300000
+  })
+}
+export const updateHostVideo = (data) => put('/host-video', data)
+export const deleteHostVideo = (id) => del(`/host-video/${id}`)
+export const updateHostVideoShowOnHome = (id, showOnHome) => put(`/host-video/${id}/showOnHome`, null, { params: { showOnHome } })
+export const updateHostVideoStatus = (id, status) => put(`/host-video/${id}/status`, null, { params: { status } })

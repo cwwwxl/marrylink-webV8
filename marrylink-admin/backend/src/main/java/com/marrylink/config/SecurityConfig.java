@@ -95,6 +95,9 @@ public class SecurityConfig {
                 .antMatchers(org.springframework.http.HttpMethod.GET, "/tag/list").permitAll()
                 .antMatchers(org.springframework.http.HttpMethod.GET, "/host/{id}").permitAll()
                 .antMatchers("/host/{id}/reviews").permitAll()
+                // 主持人视频公开接口
+                .antMatchers(org.springframework.http.HttpMethod.GET, "/host-video/home-list").permitAll()
+                .antMatchers(org.springframework.http.HttpMethod.GET, "/host-video/page").permitAll()
                 // 允许所有OPTIONS请求（CORS预检）
                 .antMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
                 // 其他所有请求需要认证

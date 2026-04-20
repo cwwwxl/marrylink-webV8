@@ -110,6 +110,22 @@
         "navigationBarBackgroundColor": "#1d4ed8",
         "navigationBarTextStyle": "white"
       }
+    },
+    {
+      "path": "pages/video/upload",
+      "style": {
+        "navigationBarTitleText": "案例视频",
+        "navigationBarBackgroundColor": "#1d4ed8",
+        "navigationBarTextStyle": "white"
+      }
+    },
+    {
+      "path": "pages/video/play",
+      "style": {
+        "navigationBarTitleText": "视频播放",
+        "navigationBarBackgroundColor": "#1d4ed8",
+        "navigationBarTextStyle": "white"
+      }
     }
   ],
   "globalStyle": {

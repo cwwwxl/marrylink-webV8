@@ -224,3 +224,30 @@ INSERT INTO `order` (`order_no`, `user_id`, `host_id`, `wedding_date`, `wedding_
 ('ORD202601250001', 1, 1, '2026-01-25', '现代简约', 4000.00, 3),
 ('ORD202602140001', 1, 1, '2026-02-14', '浪漫婚礼', 5000.00, 3),
 ('ORD202603080001', 1, 1, '2026-03-08', '春季婚礼', 3800.00, 1);
+
+-- 主持人视频表
+CREATE TABLE IF NOT EXISTS `host_video` (
+    `id` BIGINT PRIMARY KEY AUTO_INCREMENT,
+    `host_id` BIGINT NOT NULL COMMENT '主持人ID',
+    `title` VARCHAR(200) NOT NULL COMMENT '视频标题',
+    `description` VARCHAR(500) COMMENT '视频描述',
+    `video_url` VARCHAR(500) NOT NULL COMMENT '视频文件路径',
+    `cover_url` VARCHAR(500) COMMENT '封面图片路径',
+    `duration` INT COMMENT '视频时长(秒)',
+    `file_size` BIGINT COMMENT '文件大小(字节)',
+    `status` TINYINT DEFAULT 1 COMMENT '1:正常 2:待审核 0:禁用',
+    `show_on_home` TINYINT DEFAULT 0 COMMENT '1:在新人主页展示 0:不展示',
+    `sort_order` INT DEFAULT 0 COMMENT '排序序号',
+    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    `is_deleted` TINYINT DEFAULT 0,
+    INDEX `idx_host_id` (`host_id`),
+    INDEX `idx_status` (`status`),
+    INDEX `idx_show_on_home` (`show_on_home`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 初始化测试视频数据
+INSERT INTO `host_video` (`host_id`, `title`, `description`, `video_url`, `file_size`, `status`, `show_on_home`, `sort_order`) VALUES
+(1, '浪漫中式婚礼精彩片段', '张主持在一场中式婚礼中的精彩主持片段', '/uploads/videos/sample1.mp4', 52428800, 1, 1, 1),
+(1, '户外西式婚礼全程回顾', '一场温馨的户外西式婚礼全程主持回顾', '/uploads/videos/sample2.mp4', 104857600, 1, 1, 2),
+(1, '婚礼互动游戏环节', '婚礼现场趣味互动游戏环节剪辑', '/uploads/videos/sample3.mp4', 31457280, 1, 0, 3);

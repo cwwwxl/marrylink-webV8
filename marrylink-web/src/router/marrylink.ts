@@ -32,6 +32,14 @@ export const marrylinkRoutes: RouteRecordRaw[] = [
         }
       },
       {
+        path: 'video',
+        name: 'VideoManage',
+        component: () => import('@/views/marrylink/video/index.vue'),
+        meta: {
+          title: '案例视频',
+        }
+      },
+      {
         path: 'user',
         name: 'UserManage',
         component: () => import('@/views/marrylink/user/index.vue'),
