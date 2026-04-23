@@ -151,8 +151,6 @@ export default {
     depositPrice() {
       return (this.totalPrice * 0.3).toFixed(2)
     },
-      return this.userInfo && this.userInfo.userType === 'HOST'
-    },
     currentYearMonth() {
       const year = this.currentDate.getFullYear()
       const month = this.currentDate.getMonth() + 1
