@@ -104,8 +104,8 @@ CREATE TABLE IF NOT EXISTS platform_settings (
     update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='平台设置';
 
--- Insert default commission rate
-INSERT INTO platform_settings (setting_key, setting_value, description) VALUES
+-- Insert default commission rate (IGNORE prevents error if already exists)
+INSERT IGNORE INTO platform_settings (setting_key, setting_value, description) VALUES
 ('commission_rate', '10.00', '平台佣金比例(%)'),
 ('commission_deadline_days', '7', '佣金支付截止天数');
 
@@ -120,7 +120,7 @@ ALTER TABLE `order` ADD COLUMN pay_time DATETIME COMMENT '支付时间';
 -- ============================================
 -- 财务管理权限数据
 -- ============================================
-INSERT INTO `sys_permission` (`permission_code`, `permission_name`, `resource_type`, `resource_path`, `parent_id`) VALUES
+INSERT IGNORE INTO `sys_permission` (`permission_code`, `permission_name`, `resource_type`, `resource_path`, `parent_id`) VALUES
 -- 结算管理
 ('admin:settlement:view', '查看结算列表', 'API', '/api/v1/settlement/page', 0),
 ('admin:settlement:manage', '管理结算', 'API', '/api/v1/settlement/*', 0),
