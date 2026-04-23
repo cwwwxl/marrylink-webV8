@@ -37,3 +37,40 @@ export function updateOrderStatus(id, status) {
 export function rateOrder(id, rating, comment) {
   return post(`/order/${id}/rate`, { rating, comment })
 }
+
+// ==================== 佣金管理 ====================
+/**
+ * 获取佣金订单列表（主持人查看自己的）
+ */
+export function getCommissionList(params) {
+  return get('/commission/page', params)
+}
+
+/**
+ * 主持人支付佣金
+ */
+export function payCommission(id) {
+  return post(`/commission/pay/${id}`)
+}
+
+// ==================== 主持人钱包 ====================
+/**
+ * 获取我的钱包
+ */
+export function getMyWallet() {
+  return get('/host-wallet/my')
+}
+
+/**
+ * 提现申请
+ */
+export function submitWithdrawal(data) {
+  return post('/host-wallet/withdraw', data)
+}
+
+/**
+ * 获取提现记录
+ */
+export function getWithdrawalList(params) {
+  return get('/host-wallet/withdrawal/page', params)
+}

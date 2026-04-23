@@ -126,6 +126,22 @@
         "navigationBarBackgroundColor": "#1d4ed8",
         "navigationBarTextStyle": "white"
       }
+    },
+    {
+      "path": "pages/commission/index",
+      "style": {
+        "navigationBarTitleText": "佣金管理",
+        "navigationBarBackgroundColor": "#1d4ed8",
+        "navigationBarTextStyle": "white"
+      }
+    },
+    {
+      "path": "pages/wallet/index",
+      "style": {
+        "navigationBarTitleText": "我的钱包",
+        "navigationBarBackgroundColor": "#1d4ed8",
+        "navigationBarTextStyle": "white"
+      }
     }
   ],
   "globalStyle": {

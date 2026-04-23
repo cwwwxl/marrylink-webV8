@@ -76,6 +76,29 @@
         </scroll-view>
       </view>
       
+      <!-- 主持人专属：财务管理 -->
+      <view class="section" v-if="userInfo.userType === 'HOST'">
+        <view class="section-header">
+          <text class="section-title">财务管理</text>
+        </view>
+        <view class="menu-list">
+          <view class="menu-item" @click="goToCommission">
+            <view class="menu-left">
+              <text class="menu-icon">💰</text>
+              <text class="menu-text">佣金管理</text>
+            </view>
+            <text class="menu-arrow">›</text>
+          </view>
+          <view class="menu-item" @click="goToWallet">
+            <view class="menu-left">
+              <text class="menu-icon">👛</text>
+              <text class="menu-text">我的钱包</text>
+            </view>
+            <text class="menu-arrow">›</text>
+          </view>
+        </view>
+      </view>
+
       <!-- 功能菜单 -->
       <view class="section">
         <view class="menu-list">
@@ -251,18 +274,31 @@ export default {
     // 跳转到订单列表
     goToOrders(status) {
       if (!this.isLoggedIn) {
-        uni.navigateTo({
-          url: '/pages/login/index'
-        })
+        uni.navigateTo({ url: '/pages/login/index' })
         return
       }
-      
       const url = status ? `/pages/order/index?status=${status}` : '/pages/order/index'
-      uni.navigateTo({
-        url
-      })
+      uni.navigateTo({ url })
     },
-    
+
+    // 跳转到佣金管理
+    goToCommission() {
+      if (!this.isLoggedIn) {
+        uni.navigateTo({ url: '/pages/login/index' })
+        return
+      }
+      uni.navigateTo({ url: '/pages/commission/index' })
+    },
+
+    // 跳转到我的钱包
+    goToWallet() {
+      if (!this.isLoggedIn) {
+        uni.navigateTo({ url: '/pages/login/index' })
+        return
+      }
+      uni.navigateTo({ url: '/pages/wallet/index' })
+    },
+
     // 跳转到我的问卷
     goToMyQuestionnaires() {
       if (!this.isLoggedIn) {

@@ -20,4 +20,16 @@ public class MessageServiceImpl extends ServiceImpl<MessageMapper, Message> impl
         message.setStatus(1);
         this.save(message);
     }
+
+    @Async
+    @Override
+    public void sendCommissionBillMessage(Long hostId, String orderNo, String commissionAmount, String deadline) {
+        Message message = new Message();
+        message.setHostId(hostId);
+        message.setContent("您有一笔佣金账单待支付！订单号：" + orderNo
+                + "，佣金金额：¥" + commissionAmount
+                + "，请在 " + deadline + " 前完成支付，逾期将限制接单。");
+        message.setStatus(1);
+        this.save(message);
+    }
 }

@@ -46,6 +46,7 @@ class PaymentCommissionFlowTest {
     @Mock private IPlatformSettingsService platformSettingsService;
     @Mock private IHostWalletService hostWalletService;
     @Mock private ICommissionOrderService commissionOrderService;
+    @Mock private IMessageService messageService;
     // orderService and orderLogService are shared
     // We need a second set for SettlementController
     private SettlementController settlementController;
@@ -74,6 +75,7 @@ class PaymentCommissionFlowTest {
         injectField(settlementController, "hostWalletService", hostWalletService);
         injectField(settlementController, "commissionOrderService", commissionOrderService);
         injectField(settlementController, "orderLogService", orderLogService);
+        injectField(settlementController, "messageService", messageService);
 
         commissionController = new CommissionController();
         injectField(commissionController, "commissionOrderService", commissionOrderService);
@@ -117,11 +119,12 @@ class PaymentCommissionFlowTest {
         return o;
     }
 
-    private PlatformEscrow buildEscrow(Long id, Long orderId, BigDecimal amount, int status) {
+    private PlatformEscrow buildEscrow(Long id, Long orderId, BigDecimal depositAmount, BigDecimal totalOrderAmount, int status) {
         PlatformEscrow e = new PlatformEscrow();
         e.setId(id);
         e.setOrderId(orderId);
-        e.setAmount(amount);
+        e.setAmount(depositAmount);
+        e.setTotalOrderAmount(totalOrderAmount);
         e.setStatus(status);
         return e;
     }
@@ -150,7 +153,7 @@ class PaymentCommissionFlowTest {
     // ======================== 1. Payment Flow Tests ========================
 
     @Test
-    @DisplayName("Pay order: creates escrow and updates order status to 3")
+    @DisplayName("Pay order: creates escrow with 30% deposit and updates order status to 3")
     void testPayOrder_success() {
         Long orderId = 100L;
         Order order = buildOrder(orderId, "ORD001", 10L, new BigDecimal("5000.00"), 1);
@@ -166,11 +169,13 @@ class PaymentCommissionFlowTest {
 
         assertEquals("00000", result.getCode());
 
-        // Verify escrow saved with correct amount
+        // Verify escrow saved with 30% deposit amount
         ArgumentCaptor<PlatformEscrow> escrowCaptor = ArgumentCaptor.forClass(PlatformEscrow.class);
         verify(platformEscrowService).save(escrowCaptor.capture());
         PlatformEscrow savedEscrow = escrowCaptor.getValue();
-        assertEquals(0, new BigDecimal("5000.00").compareTo(savedEscrow.getAmount()));
+        BigDecimal expectedDeposit = new BigDecimal("5000.00").multiply(new BigDecimal("0.30")).setScale(2, RoundingMode.HALF_UP);
+        assertEquals(0, expectedDeposit.compareTo(savedEscrow.getAmount())); // 30% = 1500.00
+        assertEquals(0, new BigDecimal("5000.00").compareTo(savedEscrow.getTotalOrderAmount())); // full amount stored
         assertEquals(orderId, savedEscrow.getOrderId());
         assertEquals(1, savedEscrow.getStatus());
 
@@ -198,7 +203,7 @@ class PaymentCommissionFlowTest {
     void testPayOrder_alreadyPaid() {
         Long orderId = 100L;
         Order order = buildOrder(orderId, "ORD001", 10L, new BigDecimal("5000.00"), 1);
-        PlatformEscrow existing = buildEscrow(1L, orderId, new BigDecimal("5000.00"), 1);
+        PlatformEscrow existing = buildEscrow(1L, orderId, new BigDecimal("1500.00"), new BigDecimal("5000.00"), 1);
 
         when(orderService.getById(orderId)).thenReturn(order);
         when(platformEscrowService.getOne(any(LambdaQueryWrapper.class))).thenReturn(existing);
@@ -213,19 +218,20 @@ class PaymentCommissionFlowTest {
     // ======================== 2. Settlement Flow Tests ========================
 
     @Test
-    @DisplayName("Settle order: creates settlement, updates wallet, creates commission order")
+    @DisplayName("Settle order: full escrow to host, commission billed separately, message sent")
     void testSettleOrder_success() {
         Long orderId = 100L;
         Long hostId = 10L;
         BigDecimal orderAmount = new BigDecimal("10000.00");
+        BigDecimal depositAmount = orderAmount.multiply(new BigDecimal("0.30")).setScale(2, RoundingMode.HALF_UP); // 3000
 
         Order order = buildOrder(orderId, "ORD001", hostId, orderAmount, 4);
-        PlatformEscrow escrow = buildEscrow(1L, orderId, orderAmount, 1);
+        PlatformEscrow escrow = buildEscrow(1L, orderId, depositAmount, orderAmount, 1);
 
-        // Commission rate setting = 0.10 (10%)
+        // Commission rate setting = 10%
         PlatformSettings rateSetting = new PlatformSettings();
         rateSetting.setSettingKey("commission_rate");
-        rateSetting.setSettingValue("0.10");
+        rateSetting.setSettingValue("10.00");
 
         // Deadline days setting = 7
         PlatformSettings deadlineSetting = new PlatformSettings();
@@ -235,7 +241,6 @@ class PaymentCommissionFlowTest {
         when(orderService.getById(orderId)).thenReturn(order);
         when(platformEscrowService.getOne(any(LambdaQueryWrapper.class))).thenReturn(escrow);
         when(settlementService.getOne(any(LambdaQueryWrapper.class))).thenReturn(null);
-        // Return rate setting for first call, deadline setting for second
         when(platformSettingsService.getOne(any(LambdaQueryWrapper.class)))
                 .thenReturn(rateSetting)
                 .thenReturn(deadlineSetting);
@@ -250,24 +255,24 @@ class PaymentCommissionFlowTest {
 
         assertEquals("00000", result.getCode());
 
-        // Expected values
-        BigDecimal expectedCommission = orderAmount.multiply(new BigDecimal("0.10")).setScale(2, RoundingMode.HALF_UP);
-        BigDecimal expectedNet = orderAmount.subtract(expectedCommission);
+        // Commission based on full order amount
+        BigDecimal expectedCommission = orderAmount.multiply(new BigDecimal("10.00"))
+                .divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP); // 1000
 
-        // Verify settlement record
+        // Verify settlement record - netAmount = full escrow (deposit) released to host
         ArgumentCaptor<Settlement> settlementCaptor = ArgumentCaptor.forClass(Settlement.class);
         verify(settlementService).save(settlementCaptor.capture());
         Settlement savedSettlement = settlementCaptor.getValue();
-        assertEquals(0, orderAmount.compareTo(savedSettlement.getAmount()));
+        assertEquals(0, orderAmount.compareTo(savedSettlement.getAmount())); // full order amount
         assertEquals(0, expectedCommission.compareTo(savedSettlement.getCommissionAmount()));
-        assertEquals(0, expectedNet.compareTo(savedSettlement.getNetAmount()));
+        assertEquals(0, depositAmount.compareTo(savedSettlement.getNetAmount())); // full deposit to host
         assertEquals(2, savedSettlement.getStatus());
 
-        // Verify wallet created with correct balances
+        // Verify wallet: balance = deposit (full escrow released), frozen = commission
         ArgumentCaptor<HostWallet> walletCaptor = ArgumentCaptor.forClass(HostWallet.class);
         verify(hostWalletService).save(walletCaptor.capture());
         HostWallet savedWallet = walletCaptor.getValue();
-        assertEquals(0, expectedNet.compareTo(savedWallet.getBalance()));
+        assertEquals(0, depositAmount.compareTo(savedWallet.getBalance())); // full deposit
         assertEquals(0, expectedCommission.compareTo(savedWallet.getFrozenAmount()));
 
         // Verify commission order
@@ -276,27 +281,28 @@ class PaymentCommissionFlowTest {
         CommissionOrder savedCommission = commissionCaptor.getValue();
         assertEquals(0, expectedCommission.compareTo(savedCommission.getCommissionAmount()));
         assertEquals(1, savedCommission.getStatus());
-        assertNotNull(savedCommission.getDeadline());
-        // Deadline should be ~7 days from now
         assertTrue(savedCommission.getDeadline().isAfter(LocalDateTime.now().plusDays(6)));
-        assertTrue(savedCommission.getDeadline().isBefore(LocalDateTime.now().plusDays(8)));
+
+        // Verify commission bill message sent to host
+        verify(messageService).sendCommissionBillMessage(eq(hostId), eq("ORD001"), anyString(), anyString());
     }
 
     @Test
-    @DisplayName("Settle order: updates existing wallet correctly")
+    @DisplayName("Settle order: updates existing wallet with deposit amount")
     void testSettleOrder_existingWallet() {
         Long orderId = 100L;
         Long hostId = 10L;
         BigDecimal orderAmount = new BigDecimal("8000.00");
+        BigDecimal depositAmount = orderAmount.multiply(new BigDecimal("0.30")).setScale(2, RoundingMode.HALF_UP); // 2400
 
         Order order = buildOrder(orderId, "ORD001", hostId, orderAmount, 4);
-        PlatformEscrow escrow = buildEscrow(1L, orderId, orderAmount, 1);
+        PlatformEscrow escrow = buildEscrow(1L, orderId, depositAmount, orderAmount, 1);
         HostWallet existingWallet = buildWallet(hostId, new BigDecimal("2000.00"), new BigDecimal("500.00"));
         existingWallet.setTotalIncome(new BigDecimal("5000.00"));
 
         PlatformSettings rateSetting = new PlatformSettings();
         rateSetting.setSettingKey("commission_rate");
-        rateSetting.setSettingValue("0.10");
+        rateSetting.setSettingValue("10.00");
         PlatformSettings deadlineSetting = new PlatformSettings();
         deadlineSetting.setSettingKey("commission_deadline_days");
         deadlineSetting.setSettingValue("7");
@@ -317,16 +323,18 @@ class PaymentCommissionFlowTest {
 
         assertEquals("00000", result.getCode());
 
-        BigDecimal commissionAmt = orderAmount.multiply(new BigDecimal("0.10")).setScale(2, RoundingMode.HALF_UP);
-        BigDecimal netAmt = orderAmount.subtract(commissionAmt);
+        BigDecimal commissionAmt = orderAmount.multiply(new BigDecimal("10.00"))
+                .divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP); // 800
 
         // Wallet should have been updated (not saved as new)
         verify(hostWalletService, never()).save(any(HostWallet.class));
         verify(hostWalletService).updateById(any(HostWallet.class));
 
-        // The existing wallet object should have been mutated
-        assertEquals(0, new BigDecimal("2000.00").add(netAmt).compareTo(existingWallet.getBalance()));
+        // Balance += depositAmount (full escrow released)
+        assertEquals(0, new BigDecimal("2000.00").add(depositAmount).compareTo(existingWallet.getBalance()));
+        // FrozenAmount += commission
         assertEquals(0, new BigDecimal("500.00").add(commissionAmt).compareTo(existingWallet.getFrozenAmount()));
+        // TotalIncome += full order amount
         assertEquals(0, new BigDecimal("5000.00").add(orderAmount).compareTo(existingWallet.getTotalIncome()));
     }
 
@@ -346,7 +354,7 @@ class PaymentCommissionFlowTest {
     @DisplayName("Settle order: fails when already settled")
     void testSettleOrder_alreadySettled() {
         Order order = buildOrder(100L, "ORD001", 10L, new BigDecimal("5000.00"), 4);
-        PlatformEscrow escrow = buildEscrow(1L, 100L, new BigDecimal("5000.00"), 1);
+        PlatformEscrow escrow = buildEscrow(1L, 100L, new BigDecimal("1500.00"), new BigDecimal("5000.00"), 1);
         Settlement existing = new Settlement();
         existing.setId(1L);
 

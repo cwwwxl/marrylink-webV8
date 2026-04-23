@@ -13,6 +13,8 @@ public class PlatformEscrow {
     private Long orderId;
     private String orderNo;
     private BigDecimal amount;
+    /** 订单全额（用于佣金计算） */
+    private BigDecimal totalOrderAmount;
     /** 1=托管中 2=已结算 3=已退款 */
     private Integer status;
     private LocalDateTime payTime;

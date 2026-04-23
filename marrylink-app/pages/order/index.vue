@@ -43,6 +43,10 @@
               <text class="label">订单金额:</text>
               <text class="value amount">¥{{ order.amount }}</text>
             </view>
+            <view class="info-row" v-if="order.depositAmount">
+              <text class="label">已付定金(30%):</text>
+              <text class="value deposit-amount">¥{{ order.depositAmount }}</text>
+            </view>
             <view class="info-row">
               <text class="label">创建日期:</text>
               <text class="value">{{ formatDate(order.createTime) }}</text>
@@ -477,6 +481,12 @@ export default {
           color: #1d4ed8;
           font-weight: bold;
           font-size: 32rpx;
+        }
+
+        &.deposit-amount {
+          color: #07c160;
+          font-weight: bold;
+          font-size: 28rpx;
         }
       }
     }

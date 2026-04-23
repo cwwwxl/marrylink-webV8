@@ -16,6 +16,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletRequest;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 
 @RestController
@@ -31,7 +33,7 @@ public class PaymentController {
 
     /**
      * 用户支付订单（模拟支付）
-     * 创建平台托管记录，更新订单支付状态和订单状态
+     * 新人只需支付30%定金，创建平台托管记录
      */
     @PostMapping("/pay/{orderId}")
     @Transactional(rollbackFor = Exception.class)
@@ -49,11 +51,20 @@ public class PaymentController {
             return Result.error("该订单已支付");
         }
 
-        // 创建平台托管记录
+        // 计算定金金额（30%）
+        BigDecimal depositAmount = order.getDepositAmount();
+        if (depositAmount == null || depositAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            depositAmount = order.getAmount()
+                    .multiply(new BigDecimal("0.30"))
+                    .setScale(2, RoundingMode.HALF_UP);
+        }
+
+        // 创建平台托管记录（只托管定金30%）
         PlatformEscrow escrow = new PlatformEscrow();
         escrow.setOrderId(orderId);
         escrow.setOrderNo(order.getOrderNo());
-        escrow.setAmount(order.getAmount());
+        escrow.setAmount(depositAmount);              // 定金金额
+        escrow.setTotalOrderAmount(order.getAmount()); // 订单全额
         escrow.setStatus(1); // 托管中
         escrow.setPayTime(LocalDateTime.now());
         platformEscrowService.save(escrow);
@@ -64,6 +75,7 @@ public class PaymentController {
         updateOrder.setId(orderId);
         updateOrder.setPaymentStatus(1);
         updateOrder.setStatus(3); // 定金已付
+        updateOrder.setDepositAmount(depositAmount);
         orderService.updateById(updateOrder);
 
         // 记录日志

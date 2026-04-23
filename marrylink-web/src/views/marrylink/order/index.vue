@@ -61,6 +61,14 @@
             ¥{{ scope.row.amount }}
           </template>
         </el-table-column>
+        <el-table-column label="定金(30%)" width="100">
+          <template #default="scope">
+            <span v-if="scope.row.depositAmount" style="color: #07c160; font-weight: bold;">
+              ¥{{ scope.row.depositAmount }}
+            </span>
+            <span v-else style="color: #999;">--</span>
+          </template>
+        </el-table-column>
         <el-table-column label="订单状态" width="100">
           <template #default="scope">
             <el-tag :type="getStatusType(scope.row.status)">

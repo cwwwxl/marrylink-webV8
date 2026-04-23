@@ -75,8 +75,15 @@
 
             <!-- 微信支付样式金额 -->
             <view class="price-section">
-              <text class="section-label">支付金额</text>
-              <text class="price">¥{{ totalPrice }}</text>
+              <text class="section-label">订单总额</text>
+              <text class="price-original">¥{{ totalPrice }}</text>
+            </view>
+            <view class="price-section deposit">
+              <text class="section-label">定金支付（30%）</text>
+              <text class="price">¥{{ depositPrice }}</text>
+            </view>
+            <view class="price-tip-text">
+              <text>*仅需支付30%定金，剩余费用线下结算</text>
             </view>
           </view>
 
@@ -138,6 +145,12 @@ export default {
   computed: {
     ...mapState('user', ['userInfo']),
     isHost() {
+      return this.userInfo && this.userInfo.userType === 'HOST'
+    },
+    // 计算定金金额（30%）
+    depositPrice() {
+      return (this.totalPrice * 0.3).toFixed(2)
+    },
       return this.userInfo && this.userInfo.userType === 'HOST'
     },
     currentYearMonth() {
@@ -263,7 +276,7 @@ export default {
           hostId: this.hostId,
           weddingDate: this.selectedDate,
           weddingType: this.selectedWeddingType,
-          payAmount: this.totalPrice
+          payAmount: parseFloat(this.depositPrice) // 只支付30%定金
         })
         this.payLoading = false
         this.paySuccess = true
@@ -492,6 +505,25 @@ export default {
     font-size: 38rpx;
     font-weight: bold;
     color: #07c160;
+  }
+  .price-original {
+    font-size: 28rpx;
+    color: #999;
+    text-decoration: line-through;
+  }
+  &.deposit {
+    margin-top: 16rpx;
+    padding: 16rpx 20rpx;
+    background-color: #f0faf4;
+    border-radius: 12rpx;
+  }
+}
+
+.price-tip-text {
+  margin-top: 12rpx;
+  text {
+    font-size: 22rpx;
+    color: #999;
   }
 }
 

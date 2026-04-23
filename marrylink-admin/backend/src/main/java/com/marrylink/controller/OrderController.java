@@ -108,10 +108,20 @@ public class OrderController {
         Long hostId = Long.valueOf(params.get("hostId").toString());
         Long userId = SecurityUtils.getCurrentRefId();
 
+        // 检查主持人是否被限制接单
+        Host host = hostService.getById(hostId);
+        if (host.getCanAcceptOrder() != null && host.getCanAcceptOrder() == 0) {
+            return Result.error("该主持人暂时无法接单");
+        }
+
         Order order = new Order();
         order.setOrderNo(UUID.fastUUID().toString());
-        Host host = hostService.getById(hostId);
         order.setAmount(host.getPrice());
+        // 计算定金：订单总额的30%
+        BigDecimal depositAmount = host.getPrice()
+                .multiply(new BigDecimal("0.30"))
+                .setScale(2, RoundingMode.HALF_UP);
+        order.setDepositAmount(depositAmount);
         order.setHostId(hostId);
         order.setHostName(host.getName());
         order.setUserId(userId);
@@ -121,12 +131,12 @@ public class OrderController {
         order.setWeddingType(params.get("weddingType").toString());
 
         String dateStr = params.get("weddingDate").toString();
-        DateTimeFormatter formatter = DateTimeFormatter.ISO_LOCAL_DATE; // 或自定义格式
+        DateTimeFormatter formatter = DateTimeFormatter.ISO_LOCAL_DATE;
         LocalDate weddingDate = LocalDate.parse(dateStr, formatter);
         order.setWeddingDate(weddingDate);
         orderService.save(order);
 
-        messageService.sendOrderCreatedMessage(userId,hostId, order.getUserName(), weddingDate.toString());
+        messageService.sendOrderCreatedMessage(userId, hostId, order.getUserName(), weddingDate.toString());
 
         return Result.ok();
     }
@@ -297,6 +307,7 @@ public class OrderController {
     /**
      * 订单支付时自动创建平台托管记录
      * 在订单状态变为3（定金已付）时调用
+     * 新人只需支付30%定金，定金托管在平台
      */
     private void autoCreateEscrow(Order order) {
         // 检查是否已有托管记录
@@ -307,26 +318,37 @@ public class OrderController {
             return; // 已存在，跳过
         }
 
-        // 创建平台托管记录
+        // 计算定金金额（30%），如果订单已有定金字段则使用，否则现场计算
+        BigDecimal depositAmount = order.getDepositAmount();
+        if (depositAmount == null || depositAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            depositAmount = order.getAmount()
+                    .multiply(new BigDecimal("0.30"))
+                    .setScale(2, RoundingMode.HALF_UP);
+        }
+
+        // 创建平台托管记录（托管定金30%，记录订单全额）
         PlatformEscrow escrow = new PlatformEscrow();
         escrow.setOrderId(order.getId());
         escrow.setOrderNo(order.getOrderNo());
-        escrow.setAmount(order.getAmount());
+        escrow.setAmount(depositAmount);              // 实际托管金额=定金30%
+        escrow.setTotalOrderAmount(order.getAmount()); // 订单全额，用于佣金计算
         escrow.setStatus(1); // 托管中
         escrow.setPayTime(LocalDateTime.now());
         platformEscrowService.save(escrow);
 
-        // 更新订单支付状态
+        // 更新订单支付状态和定金金额
         Order updateOrder = new Order();
         updateOrder.setId(order.getId());
         updateOrder.setPaymentStatus(1); // 已支付
         updateOrder.setPayTime(LocalDateTime.now());
+        updateOrder.setDepositAmount(depositAmount);
         orderService.updateById(updateOrder);
     }
 
     /**
      * 订单完成时自动结算并生成佣金订单
      * 在订单状态变为4（已完成）时调用
+     * 流程：全额打给主持人 → 发送佣金账单 → 主持人支付佣金
      */
     private void autoSettleOrder(Order order) {
         // 检查是否已结算
@@ -354,11 +376,17 @@ public class OrderController {
             commissionRate = new BigDecimal(rateSetting.getSettingValue());
         }
 
-        // 计算佣金
-        BigDecimal orderAmount = escrow.getAmount();
-        BigDecimal commissionAmount = orderAmount.multiply(commissionRate)
+        // 使用订单全额计算佣金（不是定金金额）
+        BigDecimal totalOrderAmount = escrow.getTotalOrderAmount() != null
+                ? escrow.getTotalOrderAmount() : order.getAmount();
+        BigDecimal escrowAmount = escrow.getAmount(); // 实际托管的定金金额
+
+        // 佣金基于订单全额计算
+        BigDecimal commissionAmount = totalOrderAmount.multiply(commissionRate)
                 .divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);
-        BigDecimal netAmount = orderAmount.subtract(commissionAmount);
+
+        // 全额打给主持人（托管的定金全部释放，不扣除佣金）
+        BigDecimal netAmount = escrowAmount; // 主持人实际收到的平台释放金额
 
         // 创建结算记录
         String settlementNo = "SE" + System.currentTimeMillis() + new Random().nextInt(1000);
@@ -368,9 +396,9 @@ public class OrderController {
         settlement.setOrderNo(order.getOrderNo());
         settlement.setHostId(order.getHostId());
         settlement.setHostName(order.getHostName());
-        settlement.setAmount(orderAmount);
-        settlement.setCommissionAmount(commissionAmount);
-        settlement.setNetAmount(netAmount);
+        settlement.setAmount(totalOrderAmount);      // 订单全额
+        settlement.setCommissionAmount(commissionAmount); // 佣金金额
+        settlement.setNetAmount(netAmount);           // 平台释放给主持人的金额
         settlement.setStatus(2); // 已结算
         settlement.setSettleTime(LocalDateTime.now());
         settlement.setOperator("system-auto");
@@ -383,23 +411,23 @@ public class OrderController {
         updateEscrow.setSettleTime(LocalDateTime.now());
         platformEscrowService.updateById(updateEscrow);
 
-        // 创建/更新主持人钱包
+        // 创建/更新主持人钱包 - 全额释放托管金额到主持人
         LambdaQueryWrapper<HostWallet> walletWrapper = new LambdaQueryWrapper<>();
         walletWrapper.eq(HostWallet::getHostId, order.getHostId());
         HostWallet wallet = hostWalletService.getOne(walletWrapper);
         if (wallet == null) {
             wallet = new HostWallet();
             wallet.setHostId(order.getHostId());
-            wallet.setBalance(netAmount);
-            wallet.setFrozenAmount(commissionAmount);
-            wallet.setTotalIncome(orderAmount);
+            wallet.setBalance(escrowAmount);           // 全额释放定金到余额
+            wallet.setFrozenAmount(commissionAmount);  // 佣金冻结待支付
+            wallet.setTotalIncome(totalOrderAmount);   // 累计收入记录订单全额
             wallet.setTotalCommission(BigDecimal.ZERO);
             wallet.setTotalWithdrawn(BigDecimal.ZERO);
             hostWalletService.save(wallet);
         } else {
-            wallet.setBalance(wallet.getBalance().add(netAmount));
+            wallet.setBalance(wallet.getBalance().add(escrowAmount));
             wallet.setFrozenAmount(wallet.getFrozenAmount().add(commissionAmount));
-            wallet.setTotalIncome(wallet.getTotalIncome().add(orderAmount));
+            wallet.setTotalIncome(wallet.getTotalIncome().add(totalOrderAmount));
             hostWalletService.updateById(wallet);
         }
 
@@ -412,6 +440,8 @@ public class OrderController {
             deadlineDays = Integer.parseInt(deadlineSetting.getSettingValue());
         }
 
+        LocalDateTime deadline = LocalDateTime.now().plusDays(deadlineDays);
+
         // 创建佣金订单
         String commissionNo = "CM" + System.currentTimeMillis() + new Random().nextInt(1000);
         CommissionOrder commissionOrder = new CommissionOrder();
@@ -420,11 +450,20 @@ public class OrderController {
         commissionOrder.setOrderNo(order.getOrderNo());
         commissionOrder.setHostId(order.getHostId());
         commissionOrder.setHostName(order.getHostName());
-        commissionOrder.setOrderAmount(orderAmount);
+        commissionOrder.setOrderAmount(totalOrderAmount);
         commissionOrder.setCommissionRate(commissionRate);
         commissionOrder.setCommissionAmount(commissionAmount);
         commissionOrder.setStatus(1); // 待支付
-        commissionOrder.setDeadline(LocalDateTime.now().plusDays(deadlineDays));
+        commissionOrder.setDeadline(deadline);
         commissionOrderService.save(commissionOrder);
+
+        // 发送佣金账单通知给主持人
+        String deadlineStr = deadline.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+        messageService.sendCommissionBillMessage(
+                order.getHostId(),
+                order.getOrderNo(),
+                commissionAmount.toString(),
+                deadlineStr
+        );
     }
 }

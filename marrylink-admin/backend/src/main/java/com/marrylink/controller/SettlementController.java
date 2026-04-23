@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Random;
 
 @RestController
@@ -34,9 +35,12 @@ public class SettlementController {
     private ICommissionOrderService commissionOrderService;
     @Autowired
     private IOrderLogService orderLogService;
+    @Autowired
+    private IMessageService messageService;
 
     /**
      * 管理员结算订单
+     * 流程：全额打给主持人 → 发送佣金账单 → 主持人支付佣金
      */
     @PostMapping("/settle/{orderId}")
     @Transactional(rollbackFor = Exception.class)
@@ -73,15 +77,19 @@ public class SettlementController {
         LambdaQueryWrapper<PlatformSettings> rateWrapper = new LambdaQueryWrapper<>();
         rateWrapper.eq(PlatformSettings::getSettingKey, "commission_rate");
         PlatformSettings rateSetting = platformSettingsService.getOne(rateWrapper);
-        BigDecimal commissionRate = new BigDecimal("0.10"); // 默认10%
+        BigDecimal commissionRate = new BigDecimal("10.00"); // 默认10%
         if (rateSetting != null) {
             commissionRate = new BigDecimal(rateSetting.getSettingValue());
         }
 
-        // 3. 计算佣金
-        BigDecimal orderAmount = escrow.getAmount();
-        BigDecimal commissionAmount = orderAmount.multiply(commissionRate).setScale(2, RoundingMode.HALF_UP);
-        BigDecimal netAmount = orderAmount.subtract(commissionAmount);
+        // 3. 使用订单全额计算佣金，全额释放托管金额给主持人
+        BigDecimal totalOrderAmount = escrow.getTotalOrderAmount() != null
+                ? escrow.getTotalOrderAmount() : order.getAmount();
+        BigDecimal escrowAmount = escrow.getAmount(); // 实际托管的定金金额
+
+        BigDecimal commissionAmount = totalOrderAmount.multiply(commissionRate)
+                .divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);
+        BigDecimal netAmount = escrowAmount; // 全额释放定金给主持人
 
         // 4. 创建结算记录
         String settlementNo = "SE" + System.currentTimeMillis() + new Random().nextInt(1000);
@@ -91,7 +99,7 @@ public class SettlementController {
         settlement.setOrderNo(order.getOrderNo());
         settlement.setHostId(order.getHostId());
         settlement.setHostName(order.getHostName());
-        settlement.setAmount(orderAmount);
+        settlement.setAmount(totalOrderAmount);
         settlement.setCommissionAmount(commissionAmount);
         settlement.setNetAmount(netAmount);
         settlement.setStatus(2); // 已结算
@@ -106,23 +114,23 @@ public class SettlementController {
         updateEscrow.setSettleTime(LocalDateTime.now());
         platformEscrowService.updateById(updateEscrow);
 
-        // 6. 创建/更新主持人钱包
+        // 6. 创建/更新主持人钱包 - 全额释放托管金额
         LambdaQueryWrapper<HostWallet> walletWrapper = new LambdaQueryWrapper<>();
         walletWrapper.eq(HostWallet::getHostId, order.getHostId());
         HostWallet wallet = hostWalletService.getOne(walletWrapper);
         if (wallet == null) {
             wallet = new HostWallet();
             wallet.setHostId(order.getHostId());
-            wallet.setBalance(netAmount);
+            wallet.setBalance(escrowAmount);
             wallet.setFrozenAmount(commissionAmount);
-            wallet.setTotalIncome(orderAmount);
+            wallet.setTotalIncome(totalOrderAmount);
             wallet.setTotalCommission(BigDecimal.ZERO);
             wallet.setTotalWithdrawn(BigDecimal.ZERO);
             hostWalletService.save(wallet);
         } else {
-            wallet.setBalance(wallet.getBalance().add(netAmount));
+            wallet.setBalance(wallet.getBalance().add(escrowAmount));
             wallet.setFrozenAmount(wallet.getFrozenAmount().add(commissionAmount));
-            wallet.setTotalIncome(wallet.getTotalIncome().add(orderAmount));
+            wallet.setTotalIncome(wallet.getTotalIncome().add(totalOrderAmount));
             hostWalletService.updateById(wallet);
         }
 
@@ -130,10 +138,12 @@ public class SettlementController {
         LambdaQueryWrapper<PlatformSettings> deadlineWrapper = new LambdaQueryWrapper<>();
         deadlineWrapper.eq(PlatformSettings::getSettingKey, "commission_deadline_days");
         PlatformSettings deadlineSetting = platformSettingsService.getOne(deadlineWrapper);
-        int deadlineDays = 7; // 默认7天
+        int deadlineDays = 7;
         if (deadlineSetting != null) {
             deadlineDays = Integer.parseInt(deadlineSetting.getSettingValue());
         }
+
+        LocalDateTime deadline = LocalDateTime.now().plusDays(deadlineDays);
 
         String commissionNo = "CM" + System.currentTimeMillis() + new Random().nextInt(1000);
         CommissionOrder commissionOrder = new CommissionOrder();
@@ -142,14 +152,23 @@ public class SettlementController {
         commissionOrder.setOrderNo(order.getOrderNo());
         commissionOrder.setHostId(order.getHostId());
         commissionOrder.setHostName(order.getHostName());
-        commissionOrder.setOrderAmount(orderAmount);
+        commissionOrder.setOrderAmount(totalOrderAmount);
         commissionOrder.setCommissionRate(commissionRate);
         commissionOrder.setCommissionAmount(commissionAmount);
         commissionOrder.setStatus(1); // 待支付
-        commissionOrder.setDeadline(LocalDateTime.now().plusDays(deadlineDays));
+        commissionOrder.setDeadline(deadline);
         commissionOrderService.save(commissionOrder);
 
-        // 8. 记录日志
+        // 8. 发送佣金账单通知给主持人
+        String deadlineStr = deadline.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+        messageService.sendCommissionBillMessage(
+                order.getHostId(),
+                order.getOrderNo(),
+                commissionAmount.toString(),
+                deadlineStr
+        );
+
+        // 9. 记录日志
         orderLogService.logOrderStatusChange(order.getOrderNo(), order.getStatus(), order.getStatus(),
                 SecurityUtils.getCurrentUsername(), "settlement");
 
