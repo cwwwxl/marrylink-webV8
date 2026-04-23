@@ -7,14 +7,17 @@ import com.marrylink.common.Result;
 import com.marrylink.entity.CommissionOrder;
 import com.marrylink.entity.Host;
 import com.marrylink.entity.HostWallet;
+import com.marrylink.entity.PlatformAccount;
 import com.marrylink.service.ICommissionOrderService;
 import com.marrylink.service.IHostService;
 import com.marrylink.service.IHostWalletService;
+import com.marrylink.service.IPlatformAccountService;
 import com.marrylink.utils.SecurityUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @RestController
@@ -27,6 +30,8 @@ public class CommissionController {
     private IHostWalletService hostWalletService;
     @Autowired
     private IHostService hostService;
+    @Autowired
+    private IPlatformAccountService platformAccountService;
 
     /**
      * 分页查询佣金订单
@@ -112,6 +117,21 @@ public class CommissionController {
         updateCommission.setStatus(2); // 已支付
         updateCommission.setPayTime(LocalDateTime.now());
         commissionOrderService.updateById(updateCommission);
+
+        // 佣金存入平台账户
+        PlatformAccount platformAccount = platformAccountService.getById(1L);
+        if (platformAccount == null) {
+            platformAccount = new PlatformAccount();
+            platformAccount.setId(1L);
+            platformAccount.setBalance(commission.getCommissionAmount());
+            platformAccount.setTotalCommissionIncome(commission.getCommissionAmount());
+            platformAccount.setTotalWithdrawn(BigDecimal.ZERO);
+            platformAccountService.save(platformAccount);
+        } else {
+            platformAccount.setBalance(platformAccount.getBalance().add(commission.getCommissionAmount()));
+            platformAccount.setTotalCommissionIncome(platformAccount.getTotalCommissionIncome().add(commission.getCommissionAmount()));
+            platformAccountService.updateById(platformAccount);
+        }
 
         // 如果主持人被禁止接单，检查是否还有逾期佣金
         Host host = hostService.getById(currentHostId);

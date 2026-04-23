@@ -250,3 +250,25 @@ export function getPlatformSettings() {
 export function updatePlatformSetting(data) {
   return put('/platform-settings/update', data)
 }
+
+// ==================== 平台财务（佣金收入 & 提现） ====================
+// 获取平台账户
+export function getPlatformAccount() {
+  return get('/platform-finance/account')
+}
+// 平台提现
+export function submitPlatformWithdrawal(data) {
+  return post('/platform-finance/withdraw', data)
+}
+// 提现记录列表
+export function getPlatformWithdrawalPage(params) {
+  return get('/platform-finance/withdrawal/page', params)
+}
+// 确认提现完成
+export function completePlatformWithdrawal(id) {
+  return put(`/platform-finance/withdrawal/${id}/complete`)
+}
+// 取消提现
+export function cancelPlatformWithdrawal(id) {
+  return put(`/platform-finance/withdrawal/${id}/cancel`)
+}

@@ -135,6 +135,14 @@ export const marrylinkRoutes: RouteRecordRaw[] = [
         meta: {
           title: '平台设置',
         }
+      },
+      {
+        path: 'platform-finance',
+        name: 'PlatformFinance',
+        component: () => import('@/views/marrylink/platform-finance/index.vue'),
+        meta: {
+          title: '平台财务',
+        }
       }
     ]
   }
