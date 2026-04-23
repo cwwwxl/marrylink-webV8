@@ -110,11 +110,12 @@ INSERT INTO platform_settings (setting_key, setting_value, description) VALUES
 ('commission_deadline_days', '7', '佣金支付截止天数');
 
 -- Add accept_order field to host table
-ALTER TABLE host ADD COLUMN IF NOT EXISTS can_accept_order TINYINT NOT NULL DEFAULT 1 COMMENT '是否可接单 0=禁止 1=允许';
+-- 注意: 如果字段已存在会报错, 可忽略或先检查后执行
+ALTER TABLE `host` ADD COLUMN can_accept_order TINYINT NOT NULL DEFAULT 1 COMMENT '是否可接单 0=禁止 1=允许';
 
--- Add payment_status to order table
-ALTER TABLE `order` ADD COLUMN IF NOT EXISTS payment_status TINYINT NOT NULL DEFAULT 0 COMMENT '支付状态 0=未支付 1=已支付 2=已退款';
-ALTER TABLE `order` ADD COLUMN IF NOT EXISTS pay_time DATETIME COMMENT '支付时间';
+-- Add payment_status and pay_time to order table
+ALTER TABLE `order` ADD COLUMN payment_status TINYINT NOT NULL DEFAULT 0 COMMENT '支付状态 0=未支付 1=已支付 2=已退款';
+ALTER TABLE `order` ADD COLUMN pay_time DATETIME COMMENT '支付时间';
 
 -- ============================================
 -- 财务管理权限数据
@@ -142,26 +143,32 @@ INSERT INTO `sys_permission` (`permission_code`, `permission_name`, `resource_ty
 ('host:settlement:view', '查看我的结算', 'API', '/api/v1/settlement/my', 0);
 
 -- 角色权限关联（管理员 - 新增财务权限）
-INSERT INTO `sys_role_permission` (`role_id`, `permission_id`)
+INSERT IGNORE INTO `sys_role_permission` (`role_id`, `permission_id`)
 SELECT r.id, p.id FROM sys_role r, sys_permission p
 WHERE r.role_code = 'ROLE_ADMIN' AND p.permission_code LIKE 'admin:%'
-AND p.permission_code NOT IN (
-    SELECT rp_inner.permission_id FROM sys_role_permission rp_inner
-    JOIN sys_permission sp ON sp.id = rp_inner.permission_id
-    WHERE rp_inner.role_id = r.id AND sp.permission_code = p.permission_code
+AND p.permission_code IN (
+    'admin:settlement:view', 'admin:settlement:manage',
+    'admin:commission:view', 'admin:commission:manage',
+    'admin:host-wallet:view', 'admin:host-wallet:manage',
+    'admin:withdrawal:view', 'admin:withdrawal:manage',
+    'admin:platform-settings:view', 'admin:platform-settings:manage'
 );
 
 -- 角色权限关联（主持人 - 新增财务权限）
-INSERT INTO `sys_role_permission` (`role_id`, `permission_id`)
+INSERT IGNORE INTO `sys_role_permission` (`role_id`, `permission_id`)
 SELECT r.id, p.id FROM sys_role r, sys_permission p
 WHERE r.role_code = 'ROLE_HOST' AND p.permission_code IN (
     'host:wallet:view', 'host:wallet:withdraw', 'host:commission:view', 'host:settlement:view'
 );
 
--- 角色权限关联（超级管理员 - 新增权限）
-INSERT INTO `sys_role_permission` (`role_id`, `permission_id`)
+-- 角色权限关联（超级管理员 - 所有新增权限）
+INSERT IGNORE INTO `sys_role_permission` (`role_id`, `permission_id`)
 SELECT r.id, p.id FROM sys_role r, sys_permission p
-WHERE r.role_code = 'ROLE_SUPER_ADMIN'
-AND p.id NOT IN (
-    SELECT rp2.permission_id FROM sys_role_permission rp2 WHERE rp2.role_id = r.id
+WHERE r.role_code = 'ROLE_SUPER_ADMIN' AND p.permission_code IN (
+    'admin:settlement:view', 'admin:settlement:manage',
+    'admin:commission:view', 'admin:commission:manage',
+    'admin:host-wallet:view', 'admin:host-wallet:manage',
+    'admin:withdrawal:view', 'admin:withdrawal:manage',
+    'admin:platform-settings:view', 'admin:platform-settings:manage',
+    'host:wallet:view', 'host:wallet:withdraw', 'host:commission:view', 'host:settlement:view'
 );
