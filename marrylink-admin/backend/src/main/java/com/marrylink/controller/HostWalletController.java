@@ -157,7 +157,11 @@ public class HostWalletController {
     @PutMapping("/withdrawal/{id}/audit")
     @Transactional(rollbackFor = Exception.class)
     public Result<Void> auditWithdrawal(@PathVariable Long id, @RequestBody Map<String, Object> params) {
-        String action = params.get("action").toString();
+        Object actionObj = params.get("action");
+        if (actionObj == null) {
+            return Result.error("缺少action参数，可选值: approve / reject / confirm_payment");
+        }
+        String action = actionObj.toString();
         WithdrawalRequest request = withdrawalRequestService.getById(id);
         if (request == null) {
             return Result.error("提现申请不存在");
