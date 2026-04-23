@@ -103,6 +103,38 @@ export const marrylinkRoutes: RouteRecordRaw[] = [
           title: '填写问卷',
           hidden: true
         }
+      },
+      {
+        path: 'settlement',
+        name: 'SettlementManage',
+        component: () => import('@/views/marrylink/settlement/index.vue'),
+        meta: {
+          title: '结算管理',
+        }
+      },
+      {
+        path: 'commission',
+        name: 'CommissionManage',
+        component: () => import('@/views/marrylink/commission/index.vue'),
+        meta: {
+          title: '佣金管理',
+        }
+      },
+      {
+        path: 'host-wallet',
+        name: 'HostWalletManage',
+        component: () => import('@/views/marrylink/host-wallet/index.vue'),
+        meta: {
+          title: '主持人钱包',
+        }
+      },
+      {
+        path: 'platform-settings',
+        name: 'PlatformSettings',
+        component: () => import('@/views/marrylink/platform-settings/index.vue'),
+        meta: {
+          title: '平台设置',
+        }
       }
     ]
   }

@@ -68,11 +68,36 @@
             </el-tag>
           </template>
         </el-table-column>
+        <el-table-column label="支付状态" width="100">
+          <template #default="scope">
+            <el-tag :type="getPaymentStatusType(scope.row.paymentStatus)">
+              {{ getPaymentStatusText(scope.row.paymentStatus) }}
+            </el-tag>
+          </template>
+        </el-table-column>
         <el-table-column label="创建时间" prop="createTime" width="150" />
-        <el-table-column label="操作" fixed="right" width="200">
+        <el-table-column label="操作" fixed="right" width="280">
           <template #default="scope">
             <el-button type="primary" icon="view" link size="small" @click="handleOpenDialog(scope.row.id, scope.row.status)">
               {{ isOrderFinished(scope.row.status) ? '查看' : '编辑' }}
+            </el-button>
+            <el-button
+              v-if="scope.row.status === 2 && scope.row.paymentStatus === 0"
+              type="success"
+              link
+              size="small"
+              @click="handlePay(scope.row.id)"
+            >
+              支付
+            </el-button>
+            <el-button
+              v-if="scope.row.status === 4 && scope.row.paymentStatus === 1"
+              type="warning"
+              link
+              size="small"
+              @click="handleSettle(scope.row.id)"
+            >
+              结算
             </el-button>
             <!-- <el-button
               v-if="!isOrderFinished(scope.row.status)"
@@ -148,7 +173,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getOrderPage, getOrderById, saveOrder, updateOrder, deleteOrder } from '@/api/marrylink-api'
+import { getOrderPage, getOrderById, saveOrder, updateOrder, deleteOrder, payOrder, settleOrder } from '@/api/marrylink-api'
 
 const queryParams = reactive({
   current: 1,
@@ -214,6 +239,16 @@ function getStatusText(status) {
 function getWeddingTypeText(type) {
   const types = { '01': '中式婚礼', '02': '西式婚礼', '03': '主题婚礼', '04': '户外婚礼' }
   return types[type] || type
+}
+
+function getPaymentStatusType(paymentStatus) {
+  const types = { 0: 'info', 1: 'success', 2: 'danger' }
+  return types[paymentStatus] || 'info'
+}
+
+function getPaymentStatusText(paymentStatus) {
+  const texts = { 0: '未支付', 1: '已支付', 2: '已退款' }
+  return texts[paymentStatus] ?? '未知'
 }
 
 async function fetchData() {
@@ -297,6 +332,30 @@ function handleSubmit() {
         loading.value = false
       }
     }
+  })
+}
+
+function handlePay(id) {
+  ElMessageBox.confirm('确认对该订单进行支付操作?', '支付确认', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    type: 'warning'
+  }).then(async () => {
+    await payOrder(id)
+    ElMessage.success('支付成功')
+    fetchData()
+  })
+}
+
+function handleSettle(id) {
+  ElMessageBox.confirm('确认对该订单进行结算操作?', '结算确认', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    type: 'warning'
+  }).then(async () => {
+    await settleOrder(id)
+    ElMessage.success('结算成功')
+    fetchData()
   })
 }
 

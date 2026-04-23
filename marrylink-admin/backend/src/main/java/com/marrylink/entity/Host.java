@@ -34,4 +34,8 @@ public class Host {
     @TableField(exist = false)
     private List<String> tags;
     private String description;
+    /**
+     * 是否可接单 0=禁止 1=允许
+     */
+    private Integer canAcceptOrder;
 }

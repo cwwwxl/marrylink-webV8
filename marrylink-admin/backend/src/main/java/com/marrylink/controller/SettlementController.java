@@ -1,0 +1,196 @@
+package com.marrylink.controller;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.marrylink.common.PageResult;
+import com.marrylink.common.Result;
+import com.marrylink.entity.*;
+import com.marrylink.service.*;
+import com.marrylink.utils.SecurityUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.*;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDateTime;
+import java.util.Random;
+
+@RestController
+@RequestMapping("/settlement")
+public class SettlementController {
+
+    @Autowired
+    private ISettlementService settlementService;
+    @Autowired
+    private IOrderService orderService;
+    @Autowired
+    private IPlatformEscrowService platformEscrowService;
+    @Autowired
+    private IPlatformSettingsService platformSettingsService;
+    @Autowired
+    private IHostWalletService hostWalletService;
+    @Autowired
+    private ICommissionOrderService commissionOrderService;
+    @Autowired
+    private IOrderLogService orderLogService;
+
+    /**
+     * 管理员结算订单
+     */
+    @PostMapping("/settle/{orderId}")
+    @Transactional(rollbackFor = Exception.class)
+    public Result<Void> settle(@PathVariable Long orderId) {
+        // 1. 验证订单状态
+        Order order = orderService.getById(orderId);
+        if (order == null) {
+            return Result.error("订单不存在");
+        }
+        if (order.getStatus() != 4) {
+            return Result.error("订单未完成，无法结算");
+        }
+
+        // 检查是否有托管记录
+        LambdaQueryWrapper<PlatformEscrow> escrowWrapper = new LambdaQueryWrapper<>();
+        escrowWrapper.eq(PlatformEscrow::getOrderId, orderId);
+        PlatformEscrow escrow = platformEscrowService.getOne(escrowWrapper);
+        if (escrow == null) {
+            return Result.error("未找到托管记录");
+        }
+        if (escrow.getStatus() != 1) {
+            return Result.error("托管记录状态异常");
+        }
+
+        // 检查是否已结算
+        LambdaQueryWrapper<Settlement> existWrapper = new LambdaQueryWrapper<>();
+        existWrapper.eq(Settlement::getOrderId, orderId);
+        Settlement existSettlement = settlementService.getOne(existWrapper);
+        if (existSettlement != null) {
+            return Result.error("该订单已结算");
+        }
+
+        // 2. 获取佣金比例
+        LambdaQueryWrapper<PlatformSettings> rateWrapper = new LambdaQueryWrapper<>();
+        rateWrapper.eq(PlatformSettings::getSettingKey, "commission_rate");
+        PlatformSettings rateSetting = platformSettingsService.getOne(rateWrapper);
+        BigDecimal commissionRate = new BigDecimal("0.10"); // 默认10%
+        if (rateSetting != null) {
+            commissionRate = new BigDecimal(rateSetting.getSettingValue());
+        }
+
+        // 3. 计算佣金
+        BigDecimal orderAmount = escrow.getAmount();
+        BigDecimal commissionAmount = orderAmount.multiply(commissionRate).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal netAmount = orderAmount.subtract(commissionAmount);
+
+        // 4. 创建结算记录
+        String settlementNo = "SE" + System.currentTimeMillis() + new Random().nextInt(1000);
+        Settlement settlement = new Settlement();
+        settlement.setSettlementNo(settlementNo);
+        settlement.setOrderId(orderId);
+        settlement.setOrderNo(order.getOrderNo());
+        settlement.setHostId(order.getHostId());
+        settlement.setHostName(order.getHostName());
+        settlement.setAmount(orderAmount);
+        settlement.setCommissionAmount(commissionAmount);
+        settlement.setNetAmount(netAmount);
+        settlement.setStatus(2); // 已结算
+        settlement.setSettleTime(LocalDateTime.now());
+        settlement.setOperator(SecurityUtils.getCurrentUsername());
+        settlementService.save(settlement);
+
+        // 5. 更新托管记录状态
+        PlatformEscrow updateEscrow = new PlatformEscrow();
+        updateEscrow.setId(escrow.getId());
+        updateEscrow.setStatus(2); // 已结算
+        updateEscrow.setSettleTime(LocalDateTime.now());
+        platformEscrowService.updateById(updateEscrow);
+
+        // 6. 创建/更新主持人钱包
+        LambdaQueryWrapper<HostWallet> walletWrapper = new LambdaQueryWrapper<>();
+        walletWrapper.eq(HostWallet::getHostId, order.getHostId());
+        HostWallet wallet = hostWalletService.getOne(walletWrapper);
+        if (wallet == null) {
+            wallet = new HostWallet();
+            wallet.setHostId(order.getHostId());
+            wallet.setBalance(netAmount);
+            wallet.setFrozenAmount(commissionAmount);
+            wallet.setTotalIncome(orderAmount);
+            wallet.setTotalCommission(BigDecimal.ZERO);
+            wallet.setTotalWithdrawn(BigDecimal.ZERO);
+            hostWalletService.save(wallet);
+        } else {
+            wallet.setBalance(wallet.getBalance().add(netAmount));
+            wallet.setFrozenAmount(wallet.getFrozenAmount().add(commissionAmount));
+            wallet.setTotalIncome(wallet.getTotalIncome().add(orderAmount));
+            hostWalletService.updateById(wallet);
+        }
+
+        // 7. 创建佣金订单
+        LambdaQueryWrapper<PlatformSettings> deadlineWrapper = new LambdaQueryWrapper<>();
+        deadlineWrapper.eq(PlatformSettings::getSettingKey, "commission_deadline_days");
+        PlatformSettings deadlineSetting = platformSettingsService.getOne(deadlineWrapper);
+        int deadlineDays = 7; // 默认7天
+        if (deadlineSetting != null) {
+            deadlineDays = Integer.parseInt(deadlineSetting.getSettingValue());
+        }
+
+        String commissionNo = "CM" + System.currentTimeMillis() + new Random().nextInt(1000);
+        CommissionOrder commissionOrder = new CommissionOrder();
+        commissionOrder.setCommissionNo(commissionNo);
+        commissionOrder.setOrderId(orderId);
+        commissionOrder.setOrderNo(order.getOrderNo());
+        commissionOrder.setHostId(order.getHostId());
+        commissionOrder.setHostName(order.getHostName());
+        commissionOrder.setOrderAmount(orderAmount);
+        commissionOrder.setCommissionRate(commissionRate);
+        commissionOrder.setCommissionAmount(commissionAmount);
+        commissionOrder.setStatus(1); // 待支付
+        commissionOrder.setDeadline(LocalDateTime.now().plusDays(deadlineDays));
+        commissionOrderService.save(commissionOrder);
+
+        // 8. 记录日志
+        orderLogService.logOrderStatusChange(order.getOrderNo(), order.getStatus(), order.getStatus(),
+                SecurityUtils.getCurrentUsername(), "settlement");
+
+        return Result.ok();
+    }
+
+    /**
+     * 管理员分页查询结算记录
+     */
+    @GetMapping("/page")
+    public Result<PageResult<Settlement>> page(
+            @RequestParam(defaultValue = "1") Long current,
+            @RequestParam(defaultValue = "10") Long size,
+            @RequestParam(required = false) Long hostId,
+            @RequestParam(required = false) Integer status,
+            @RequestParam(required = false) String orderNo) {
+
+        Page<Settlement> page = new Page<>(current, size);
+        LambdaQueryWrapper<Settlement> wrapper = new LambdaQueryWrapper<>();
+
+        if (hostId != null) {
+            wrapper.eq(Settlement::getHostId, hostId);
+        }
+        if (status != null) {
+            wrapper.eq(Settlement::getStatus, status);
+        }
+        if (orderNo != null && !orderNo.isEmpty()) {
+            wrapper.like(Settlement::getOrderNo, orderNo);
+        }
+
+        wrapper.orderByDesc(Settlement::getCreateTime);
+        settlementService.page(page, wrapper);
+
+        return Result.ok(PageResult.of(page));
+    }
+
+    /**
+     * 获取结算详情
+     */
+    @GetMapping("/{id}")
+    public Result<Settlement> getById(@PathVariable Long id) {
+        return Result.ok(settlementService.getById(id));
+    }
+}

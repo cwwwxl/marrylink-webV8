@@ -160,3 +160,93 @@ export const updateHostVideo = (data) => put('/host-video', data)
 export const deleteHostVideo = (id) => del(`/host-video/${id}`)
 export const updateHostVideoShowOnHome = (id, showOnHome) => put(`/host-video/${id}/showOnHome`, null, { params: { showOnHome } })
 export const updateHostVideoStatus = (id, status) => put(`/host-video/${id}/status`, null, { params: { status } })
+
+// ==================== 支付管理 ====================
+// 用户支付订单
+export function payOrder(orderId) {
+  return post(`/payment/pay/${orderId}`)
+}
+// 托管资金列表
+export function getEscrowPage(params) {
+  return get('/payment/escrow/page', params)
+}
+// 获取订单托管信息
+export function getEscrowByOrderId(orderId) {
+  return get(`/payment/escrow/${orderId}`)
+}
+
+// ==================== 结算管理 ====================
+// 结算订单
+export function settleOrder(orderId) {
+  return post(`/settlement/settle/${orderId}`)
+}
+// 结算列表
+export function getSettlementPage(params) {
+  return get('/settlement/page', params)
+}
+// 结算详情
+export function getSettlementById(id) {
+  return get(`/settlement/${id}`)
+}
+
+// ==================== 佣金管理 ====================
+// 佣金订单列表
+export function getCommissionPage(params) {
+  return get('/commission/page', params)
+}
+// 佣金详情
+export function getCommissionById(id) {
+  return get(`/commission/${id}`)
+}
+// 主持人支付佣金
+export function payCommission(id) {
+  return post(`/commission/pay/${id}`)
+}
+// 标记逾期
+export function markCommissionOverdue(id) {
+  return post(`/commission/mark-overdue/${id}`)
+}
+// 禁止主持人接单
+export function banHost(hostId) {
+  return post(`/commission/ban-host/${hostId}`)
+}
+// 恢复主持人接单
+export function unbanHost(hostId) {
+  return post(`/commission/unban-host/${hostId}`)
+}
+
+// ==================== 主持人钱包 ====================
+// 获取自己的钱包
+export function getMyWallet() {
+  return get('/host-wallet/my')
+}
+// 管理员获取主持人钱包
+export function getHostWallet(hostId) {
+  return get(`/host-wallet/${hostId}`)
+}
+// 钱包列表
+export function getHostWalletPage(params) {
+  return get('/host-wallet/page', params)
+}
+// 提现申请
+export function submitWithdrawal(data) {
+  return post('/host-wallet/withdraw', data)
+}
+// 提现列表
+export function getWithdrawalPage(params) {
+  return get('/host-wallet/withdrawal/page', params)
+}
+// 审核提现
+export function auditWithdrawal(id, data) {
+  return put(`/host-wallet/withdrawal/${id}/audit`, data)
+}
+
+// ==================== 平台设置 ====================
+// 获取所有设置
+export function getPlatformSettings() {
+  return get('/platform-settings/list')
+}
+// 更新设置
+export function updatePlatformSetting(data) {
+  return put('/platform-settings/update', data)
+}

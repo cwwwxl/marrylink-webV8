@@ -3,35 +3,24 @@ package com.marrylink.entity;
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Data
-@TableName("`order`")
-public class Order {
+@TableName("commission_order")
+public class CommissionOrder {
     @TableId(type = IdType.AUTO)
     private Long id;
+    private String commissionNo;
+    private Long orderId;
     private String orderNo;
-    private Long userId;
-    private String userName;
     private Long hostId;
     private String hostName;
-    private LocalDate weddingDate;
-    private String weddingType;
-    private BigDecimal amount;
-    //1: '待确认', 3: '定金已付', 4: '已完成', 5: '已取消'
+    private BigDecimal orderAmount;
+    private BigDecimal commissionRate;
+    private BigDecimal commissionAmount;
+    /** 1=待支付 2=已支付 3=逾期 */
     private Integer status;
-    /** 用户评分 1-5星，null表示未评分 */
-    private Integer rating;
-    /** 用户评价内容 */
-    private String comment;
-    /**
-     * 支付状态 0=未支付 1=已支付 2=已退款
-     */
-    private Integer paymentStatus;
-    /**
-     * 支付时间
-     */
+    private LocalDateTime deadline;
     private LocalDateTime payTime;
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;

@@ -37,6 +37,10 @@ public class MenuController {
      * | 档期管理     | ❌  | ✅  |
      * | 标签管理     | ✅  | ❌  |
      * | 问卷管理     | ✅  | ❌  |
+     * | 结算管理     | ✅  | ❌  |
+     * | 佣金管理     | ✅  | ❌  |
+     * | 主持人钱包   | ✅  | ❌  |
+     * | 平台设置     | ✅  | ❌  |
      * | 我的问卷     | ❌  | ✅  |
      */
     @GetMapping("/routes")
@@ -92,6 +96,16 @@ public class MenuController {
                     "TagManage", "标签管理", "setting"));
             children.add(createRoute("questionnaire", "marrylink/questionnaire/index",
                     "QuestionnaireManage", "问卷管理", "document"));
+
+            // ========== 财务管理 ==========
+            children.add(createRoute("settlement", "marrylink/settlement/index",
+                    "SettlementManage", "结算管理", "money"));
+            children.add(createRoute("commission", "marrylink/commission/index",
+                    "CommissionManage", "佣金管理", "money"));
+            children.add(createRoute("host-wallet", "marrylink/host-wallet/index",
+                    "HostWalletManage", "主持人钱包", "money"));
+            children.add(createRoute("platform-settings", "marrylink/platform-settings/index",
+                    "PlatformSettings", "平台设置", "setting"));
         }
 
         // ========== 主持人(HOST)专属菜单 ==========
@@ -104,6 +118,8 @@ public class MenuController {
                     "OrderManage", "我的订单", "document"));
             children.add(createRoute("questionnaire", "marrylink/questionnaire/index",
                     "QuestionnaireManage", "问卷管理", "document"));
+            children.add(createRoute("host-wallet", "marrylink/host-wallet/index",
+                    "HostWalletManage", "我的钱包", "money"));
         }
 
         marrylink.setChildren(children);
